@@ -50,10 +50,10 @@ def get_video_info(url):
 
 ydl_opts = {
     'format': 'bestaudio/best',
-    # Force the Android client to bypass HTTP 403 Forbidden on cloud servers
+    # THIS LINE BYPASSES THE 403 FORBIDDEN BLOCK:
     'extractor_args': {
         'youtube': {
-            'player_client': ['android', 'ios', 'web']
+            'player_client': ['android', 'ios']
         }
     },
     'postprocessors': [{
@@ -65,13 +65,6 @@ ydl_opts = {
     'quiet': True,
     'no_warnings': True,
 }
-    # Find created MP3 file path
-    downloaded_files = glob.glob(os.path.join(target_dir, "*.mp3"))
-    if not downloaded_files:
-        raise FileNotFoundError("Conversion failed. Could not locate output MP3.")
-    
-    return downloaded_files[0]
-
 
 # --- UI Header ---
 st.title("🎵 SonicFetch MP3 Studio")
