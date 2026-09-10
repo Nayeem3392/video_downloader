@@ -48,31 +48,23 @@ def get_video_info(url):
         return ydl.extract_info(url, download=False)
 
 
-def download_mp3(url, target_dir, size_limit_mb=300):
-    """Download best audio stream and convert to MP3 within strict size budget."""
-    
-    ydl_opts = {
-        'format': 'bestaudio/best',
-        'postprocessors': [{
-            'key': 'FFmpegExtractAudio',
-            'preferredcodec': 'mp3',
-            'preferredquality': '192',
-        }],
-        'outtmpl': os.path.join(target_dir, '%(title)s.%(ext)s'),
-        'quiet': True,
-        'no_warnings': True,
-    }
-
-    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-        info = ydl.extract_info(url, download=False)
-        filesize = info.get('filesize') or info.get('filesize_approx') or 0
-        size_mb = filesize / (1024 * 1024)
-
-        if size_mb > size_limit_mb:
-            raise ValueError(f"File size (~{size_mb:.1f} MB) exceeds maximum allowed limit ({size_limit_mb} MB).")
-
-        ydl.download([url])
-
+ydl_opts = {
+    'format': 'bestaudio/best',
+    # Force the Android client to bypass HTTP 403 Forbidden on cloud servers
+    'extractor_args': {
+        'youtube': {
+            'player_client': ['android', 'ios', 'web']
+        }
+    },
+    'postprocessors': [{
+        'key': 'FFmpegExtractAudio',
+        'preferredcodec': 'mp3',
+        'preferredquality': '192',
+    }],
+    'outtmpl': os.path.join(target_dir, '%(title)s.%(ext)s'),
+    'quiet': True,
+    'no_warnings': True,
+}
     # Find created MP3 file path
     downloaded_files = glob.glob(os.path.join(target_dir, "*.mp3"))
     if not downloaded_files:
