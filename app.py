@@ -36,13 +36,14 @@ st.markdown("""
 
 
 def get_video_info(url):
-    """Fetch video metadata with android client bypass."""
+    """Fetch video metadata bypassing datacenter IP restrictions."""
     ydl_opts = {
         'quiet': True,
         'skip_download': True,
         'extractor_args': {
             'youtube': {
-                'player_client': ['android', 'ios']
+                'player_client': ['mweb', 'tv', 'android_vr', 'web'],
+                'skip': ['dash', 'hls']
             }
         }
     }
@@ -51,14 +52,14 @@ def get_video_info(url):
 
 
 def download_mp3(url, target_dir, size_limit_mb=300):
-    """Download audio stream and convert to MP3 inside target_dir."""
+    """Download audio stream using robust cloud-friendly clients."""
     
-    # target_dir MUST be defined inside this function scope
     ydl_opts = {
-        'format': 'bestaudio/best',
+        'format': 'ba/ba*', # Best audio fallback
         'extractor_args': {
             'youtube': {
-                'player_client': ['android', 'ios']
+                'player_client': ['tv', 'mweb', 'android_vr'],
+                'player_skip': ['js'],
             }
         },
         'postprocessors': [{
@@ -69,6 +70,12 @@ def download_mp3(url, target_dir, size_limit_mb=300):
         'outtmpl': os.path.join(target_dir, '%(title)s.%(ext)s'),
         'quiet': True,
         'no_warnings': True,
+        'nocheckcertificate': True,
+        'ignoreerrors': False,
+        'logtostderr': False,
+        'add_header': [
+            ('User-Agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36')
+        ]
     }
 
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
