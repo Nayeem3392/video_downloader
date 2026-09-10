@@ -11,12 +11,10 @@ st.set_page_config(
     layout="centered"
 )
 
-# Custom CSS for dark modern sleek aesthetic
+# Custom CSS
 st.markdown("""
     <style>
-    .main {
-        background-color: #0E1117;
-    }
+    .main { background-color: #0E1117; }
     .stTextInput > div > div > input {
         border-radius: 8px;
         background-color: #1E222D;
@@ -31,40 +29,65 @@ st.markdown("""
         color: white;
         font-weight: bold;
         border: none;
-        transition: 0.3s;
     }
-    .stButton>button:hover {
-        background-color: #CC0000;
-        border: none;
-    }
+    .stButton>button:hover { background-color: #CC0000; }
     </style>
 """, unsafe_allow_html=True)
 
 
 def get_video_info(url):
-    """Fetch video metadata before initiating download."""
-    ydl_opts = {'quiet': True, 'skip_download': True}
+    """Fetch video metadata with android client bypass."""
+    ydl_opts = {
+        'quiet': True,
+        'skip_download': True,
+        'extractor_args': {
+            'youtube': {
+                'player_client': ['android', 'ios']
+            }
+        }
+    }
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         return ydl.extract_info(url, download=False)
 
 
-ydl_opts = {
-    'format': 'bestaudio/best',
-    # THIS LINE BYPASSES THE 403 FORBIDDEN BLOCK:
-    'extractor_args': {
-        'youtube': {
-            'player_client': ['android', 'ios']
-        }
-    },
-    'postprocessors': [{
-        'key': 'FFmpegExtractAudio',
-        'preferredcodec': 'mp3',
-        'preferredquality': '192',
-    }],
-    'outtmpl': os.path.join(target_dir, '%(title)s.%(ext)s'),
-    'quiet': True,
-    'no_warnings': True,
-}
+def download_mp3(url, target_dir, size_limit_mb=300):
+    """Download audio stream and convert to MP3 inside target_dir."""
+    
+    # target_dir MUST be defined inside this function scope
+    ydl_opts = {
+        'format': 'bestaudio/best',
+        'extractor_args': {
+            'youtube': {
+                'player_client': ['android', 'ios']
+            }
+        },
+        'postprocessors': [{
+            'key': 'FFmpegExtractAudio',
+            'preferredcodec': 'mp3',
+            'preferredquality': '192',
+        }],
+        'outtmpl': os.path.join(target_dir, '%(title)s.%(ext)s'),
+        'quiet': True,
+        'no_warnings': True,
+    }
+
+    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+        info = ydl.extract_info(url, download=False)
+        filesize = info.get('filesize') or info.get('filesize_approx') or 0
+        size_mb = filesize / (1024 * 1024)
+
+        if size_mb > size_limit_mb:
+            raise ValueError(f"File size (~{size_mb:.1f} MB) exceeds maximum allowed limit ({size_limit_mb} MB).")
+
+        ydl.download([url])
+
+    # Find created MP3 file path
+    downloaded_files = glob.glob(os.path.join(target_dir, "*.mp3"))
+    if not downloaded_files:
+        raise FileNotFoundError("Conversion failed. Could not locate output MP3.")
+    
+    return downloaded_files[0]
+
 
 # --- UI Header ---
 st.title("🎵 SonicFetch MP3 Studio")
