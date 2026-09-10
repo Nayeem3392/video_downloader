@@ -1,8 +1,5 @@
-import os
-import glob
-import tempfile
 import streamlit as st
-import yt_dlp
+import requests
 
 # --- Page Configuration & Styling ---
 st.set_page_config(
@@ -11,7 +8,6 @@ st.set_page_config(
     layout="centered"
 )
 
-# Custom CSS
 st.markdown("""
     <style>
     .main { background-color: #0E1117; }
@@ -34,102 +30,64 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-
-def get_video_info(url):
-    """Fetch video metadata using cookies to bypass datacenter blocking."""
-    ydl_opts = {
-        'quiet': True,
-        'skip_download': True,
-        'cookiefile': 'cookies.txt',  # Pass cookies for metadata fetch
-    }
-    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-        return ydl.extract_info(url, download=False)
-
-
-def download_mp3(url, target_dir, size_limit_mb=300):
-    """Download audio stream using cookies and convert to MP3."""
-    
-    ydl_opts = {
-        'format': 'bestaudio/best',
-        'cookiefile': 'cookies.txt',  # Pass cookies to bypass 403 Forbidden
-        'postprocessors': [{
-            'key': 'FFmpegExtractAudio',
-            'preferredcodec': 'mp3',
-            'preferredquality': '192',
-        }],
-        'outtmpl': os.path.join(target_dir, '%(title)s.%(ext)s'),
-        'quiet': True,
-        'no_warnings': True,
-    }
-
-    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-        info = ydl.extract_info(url, download=False)
-        filesize = info.get('filesize') or info.get('filesize_approx') or 0
-        size_mb = filesize / (1024 * 1024)
-
-        if size_mb > size_limit_mb:
-            raise ValueError(f"File size (~{size_mb:.1f} MB) exceeds maximum allowed limit ({size_limit_mb} MB).")
-
-        ydl.download([url])
-
-    # Find created MP3 file path
-    downloaded_files = glob.glob(os.path.join(target_dir, "*.mp3"))
-    if not downloaded_files:
-        raise FileNotFoundError("Conversion failed. Could not locate output MP3.")
-    
-    return downloaded_files[0]
-
-
 # --- UI Header ---
 st.title("🎵 SonicFetch MP3 Studio")
-st.caption("Fast, unrestricted YouTube to MP3 audio converter (Max single file limit: 300 MB)")
+st.caption("100% Cloud-Bypass YouTube to MP3 converter")
 st.divider()
 
-# --- Input Area ---
 url_input = st.text_input("Paste YouTube Video URL:", placeholder="https://www.youtube.com/watch?v=...")
 
-if url_input:
-    try:
-        with st.spinner("Fetching audio metadata..."):
-            info = get_video_info(url_input)
-
-        col1, col2 = st.columns([1, 2])
-        with col1:
-            st.image(info.get('thumbnail'), use_container_width=True)
-        with col2:
-            st.markdown(f"### {info.get('title')}")
-            st.text(f"Channel: {info.get('uploader')}")
-            
-            duration_sec = info.get('duration', 0)
-            mins, secs = divmod(duration_sec, 60)
-            st.text(f"Duration: {mins:02d}:{secs:02d}")
-
-        st.divider()
-
-        # Download Trigger
-        if st.button("🚀 Process & Prepare MP3"):
-            with tempfile.TemporaryDirectory() as temp_dir:
-                with st.spinner("Extracting high-bitrate audio & encoding to MP3..."):
-                    filepath = download_mp3(url_input, temp_dir, size_limit_mb=300)
+if st.button("🚀 Process & Prepare MP3"):
+    if not url_input:
+        st.warning("Please enter a URL first.")
+    else:
+        with st.spinner("Bypassing YouTube blocks & fetching audio..."):
+            try:
+                # We use the open-source Cobalt API to bypass Streamlit Cloud IP blocks
+                api_url = "https://api.cobalt.tools/"
+                
+                headers = {
+                    "Accept": "application/json",
+                    "Content-Type": "application/json",
+                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
+                }
+                
+                # Cobalt v7 API Payload for MP3
+                payload = {
+                    "url": url_input,
+                    "downloadMode": "audio",
+                    "audioFormat": "mp3",
+                    "filenamePattern": "pretty"
+                }
+                
+                # 1. Ask the API to extract the direct MP3 link
+                api_res = requests.post(api_url, json=payload, headers=headers)
+                
+                if api_res.status_code == 200:
+                    data = api_res.json()
+                    direct_mp3_url = data.get("url")
                     
-                    filename = os.path.basename(filepath)
-                    with open(filepath, "rb") as f:
-                        file_bytes = f.read()
-
-                st.success("Extraction complete!")
-                
-                # Native browser audio preview
-                st.audio(file_bytes, format="audio/mp3")
-                
-                # Direct Streamlit Download Button
-                st.download_button(
-                    label="💾 Save MP3 File to Device",
-                    data=file_bytes,
-                    file_name=filename,
-                    mime="audio/mpeg"
-                )
-
-    except ValueError as ve:
-        st.warning(str(ve))
-    except Exception as e:
-        st.error(f"Error processing video: {str(e)}")
+                    if direct_mp3_url:
+                        st.success("Extraction successful! Preparing your download...")
+                        
+                        # 2. Download the MP3 file bytes directly into Streamlit
+                        audio_res = requests.get(direct_mp3_url)
+                        
+                        if audio_res.status_code == 200:
+                            st.audio(audio_res.content, format="audio/mp3")
+                            
+                            st.download_button(
+                                label="💾 Save MP3 File to Device",
+                                data=audio_res.content,
+                                file_name="SonicFetch_Audio.mp3",
+                                mime="audio/mpeg"
+                            )
+                        else:
+                            st.error("Failed to retrieve the final MP3 file from the server.")
+                    else:
+                        st.error("The API couldn't generate a download link. Try another video.")
+                else:
+                    st.error(f"YouTube blocked the proxy server (Error {api_res.status_code}). Please try again later.")
+                    
+            except Exception as e:
+                st.error(f"An error occurred: {str(e)}")
