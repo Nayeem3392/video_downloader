@@ -36,32 +36,22 @@ st.markdown("""
 
 
 def get_video_info(url):
-    """Fetch video metadata bypassing datacenter IP restrictions."""
+    """Fetch video metadata using cookies to bypass datacenter blocking."""
     ydl_opts = {
         'quiet': True,
         'skip_download': True,
-        'extractor_args': {
-            'youtube': {
-                'player_client': ['mweb', 'tv', 'android_vr', 'web'],
-                'skip': ['dash', 'hls']
-            }
-        }
+        'cookiefile': 'cookies.txt',  # Pass cookies for metadata fetch
     }
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         return ydl.extract_info(url, download=False)
 
 
 def download_mp3(url, target_dir, size_limit_mb=300):
-    """Download audio stream using robust cloud-friendly clients."""
+    """Download audio stream using cookies and convert to MP3."""
     
     ydl_opts = {
-        'format': 'ba/ba*', # Best audio fallback
-        'extractor_args': {
-            'youtube': {
-                'player_client': ['tv', 'mweb', 'android_vr'],
-                'player_skip': ['js'],
-            }
-        },
+        'format': 'bestaudio/best',
+        'cookiefile': 'cookies.txt',  # Pass cookies to bypass 403 Forbidden
         'postprocessors': [{
             'key': 'FFmpegExtractAudio',
             'preferredcodec': 'mp3',
@@ -70,12 +60,6 @@ def download_mp3(url, target_dir, size_limit_mb=300):
         'outtmpl': os.path.join(target_dir, '%(title)s.%(ext)s'),
         'quiet': True,
         'no_warnings': True,
-        'nocheckcertificate': True,
-        'ignoreerrors': False,
-        'logtostderr': False,
-        'add_header': [
-            ('User-Agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36')
-        ]
     }
 
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
